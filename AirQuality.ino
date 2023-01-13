@@ -1,6 +1,76 @@
+#include <Adafruit_SGP30.h>
 #include <Arduino.h>
 #include <SensirionI2CScd4x.h>
 #include <Wire.h>
+
+class VOCSensor
+{
+public:
+  struct Data : public Printable
+  {
+    uint16_t tvoc          = 0;
+    uint16_t tvoc_baseline = 0;
+
+    uint16_t eco2          = 0;
+    uint16_t eco2_baseline = 0;
+
+    bool valid = false;
+
+    size_t printTo(Print& p) const override
+    {
+      return p.print("TVOC:") + p.print(tvoc) + p.print("\t")
+             + p.print("TVOC baseline:") + p.print(tvoc_baseline)
+             + p.println("\t") + p.print("eCO2:") + p.print(eco2)
+             + p.print("\t") + p.print("eCO2 baseline:")
+             + p.print(eco2_baseline) + p.println("\t");
+    }
+  };
+
+  explicit VOCSensor(TwoWire& i2c_bus) : m_Bus{i2c_bus}
+  {
+  }
+
+  void StartMeasurement()
+  {
+    if (!m_Sensor.begin(&m_Bus))
+    {
+      Serial.println("Could not start VOC measurement!");
+      return;
+    }
+
+    // values based on previous calibration
+    if (!m_Sensor.setIAQBaseline(37120, 39100))
+    {
+      Serial.println("Setting baseline failed");
+    }
+  }
+
+  Data GetMeasurement()
+  {
+    if (!m_Sensor.IAQmeasure())
+    {
+      Serial.println("Could not measure VOC!");
+      return {};
+    }
+
+    Data data;
+    if (!m_Sensor.getIAQBaseline(&data.eco2_baseline, &data.tvoc_baseline))
+    {
+      Serial.println("Could not determine baselines!");
+      return data;
+    }
+
+    data.tvoc  = m_Sensor.TVOC;
+    data.eco2  = m_Sensor.eCO2;
+    data.valid = true;
+
+    return data;
+  }
+
+private:
+  TwoWire&       m_Bus;
+  Adafruit_SGP30 m_Sensor;
+};
 
 class CO2Sensor
 {
@@ -94,6 +164,7 @@ private:
 };
 
 auto co2_sensor = CO2Sensor{Wire};
+auto voc_sensor = VOCSensor{Wire};
 
 void setup()
 {
@@ -105,16 +176,22 @@ void setup()
 
   Wire.begin();
   co2_sensor.StartMeasurement();
+  voc_sensor.StartMeasurement();
 }
 
 void loop()
 {
   delay(1000);
 
-  // Read Measurement
-  auto const data = co2_sensor.GetMeasurement();
-  if (data.valid)
+  auto const co2_data = co2_sensor.GetMeasurement();
+  if (co2_data.valid)
   {
-    Serial.println(data);
+    Serial.println(co2_data);
+  }
+
+  auto const tvoc_data = voc_sensor.GetMeasurement();
+  if (tvoc_data.valid)
+  {
+    Serial.println(tvoc_data);
   }
 }

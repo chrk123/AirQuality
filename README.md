@@ -12,7 +12,7 @@ This one provides readings for PM1.0, PM2.5, PM4 and PM10. Not implemented yet.
 
 ## Sensirion SGP30
 
-This one is used to measure VOC. Not implemented yet.
+This one is used to measure TVOC.
 
 ## Future ideas
 

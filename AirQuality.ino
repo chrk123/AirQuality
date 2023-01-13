@@ -18,11 +18,11 @@ public:
 
     size_t printTo(Print& p) const override
     {
-      return p.print("TVOC:") + p.print(tvoc) + p.print("\t")
-             + p.print("TVOC baseline:") + p.print(tvoc_baseline)
-             + p.println("\t") + p.print("eCO2:") + p.print(eco2)
-             + p.print("\t") + p.print("eCO2 baseline:")
-             + p.print(eco2_baseline) + p.println("\t");
+      return p.print("TVOC: ") + p.print(tvoc) + p.print("ppb\t")
+             + p.print("TVOC baseline: ") + p.print(tvoc_baseline)
+             + p.println("\t") + p.print("eCO2: ") + p.print(eco2)
+             + p.print("ppm\t") + p.print("eCO2 baseline: ")
+             + p.print(eco2_baseline) + p.print("\t");
     }
   };
 
@@ -86,9 +86,10 @@ public:
 
     size_t printTo(Print& p) const override
     {
-      return p.print("Co2:") + p.print(co2) + p.print("\t")
-             + p.print("Temperature:") + p.print(temperature) + p.print("\t")
-             + p.print("Humidity:") + p.print(humidity);
+      return p.print("Co2: ") + p.print(co2) + p.print("ppm\t")
+             + p.print("Temperature: ") + p.print(temperature)
+             + p.print("°C\t") + p.print("Humidity: ") + p.print(humidity)
+             + p.print("%");
     }
   };
 

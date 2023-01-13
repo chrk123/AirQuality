@@ -30,6 +30,12 @@ public:
   {
   }
 
+  VOCSensor(VOCSensor const&)            = delete;
+  VOCSensor(VOCSensor&&)                 = delete;
+  VOCSensor& operator=(VOCSensor const&) = delete;
+  VOCSensor& operator=(VOCSensor&&)      = delete;
+  ~VOCSensor()                           = default;
+
   void StartMeasurement()
   {
     if (!m_Sensor.begin(&m_Bus))
@@ -97,6 +103,16 @@ public:
   {
   }
 
+  CO2Sensor(CO2Sensor const&)            = delete;
+  CO2Sensor(CO2Sensor&&)                 = delete;
+  CO2Sensor& operator=(CO2Sensor const&) = delete;
+  CO2Sensor& operator=(CO2Sensor&&)      = delete;
+
+  ~CO2Sensor()
+  {
+    StopMeasurement();
+  }
+
   Data GetMeasurement()
   {
     bool has_data = false;
@@ -146,11 +162,6 @@ public:
     }
   }
 
-  ~CO2Sensor()
-  {
-    StopMeasurement();
-  }
-
 private:
   void PrintErrorMessage(uint16_t error)
   {
@@ -164,8 +175,8 @@ private:
   SensirionI2CScd4x m_Sensor;
 };
 
-auto co2_sensor = CO2Sensor{Wire};
-auto voc_sensor = VOCSensor{Wire};
+CO2Sensor co2_sensor{Wire};
+VOCSensor voc_sensor{Wire};
 
 void setup()
 {

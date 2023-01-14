@@ -2,6 +2,101 @@
 #include <Arduino.h>
 #include <SensirionI2CScd4x.h>
 #include <Wire.h>
+#include <sps30.h>
+
+class SPSSensor
+{
+public:
+  struct Data : public Printable
+  {
+    explicit Data() = default;
+    explicit Data(sps30_measurement& m)
+      : pm1{m.mc_1p0}
+      , pm25{m.mc_2p5}
+      , pm4{m.mc_4p0}
+      , pm10{m.mc_10p0}
+      , valid{true}
+    {
+    }
+
+    float pm1  = 0.;
+    float pm25 = 0.;
+    float pm4  = 0.;
+    float pm10 = 0.;
+
+    // indicate if the measurement is valid
+    bool valid = false;
+
+    size_t printTo(Print& p) const override
+    {
+      return p.print("PM1: ") + p.print(pm1) + p.print("μg/m3\t")
+             + p.print("PM2.5: ") + p.print(pm25) + p.print("μg/m3\t")
+             + p.print("PM4.0: ") + p.print(pm4) + p.print("μg/m3\t")
+             + p.print("PM10.0: ") + p.print(pm10) + p.print("μg/m3\t");
+    }
+  };
+
+  SPSSensor()                            = default;
+  SPSSensor(SPSSensor const&)            = delete;
+  SPSSensor(SPSSensor&&)                 = delete;
+  SPSSensor& operator=(SPSSensor const&) = delete;
+  SPSSensor& operator=(SPSSensor&&)      = delete;
+  ~SPSSensor()
+  {
+    StopMeasurement();
+  }
+
+  void StartMeasurement()
+  {
+    while (sps30_probe() != 0)
+    {
+      Serial.println("SPS sensor probing failed");
+      delay(500);
+    }
+
+    if (auto const ret = sps30_set_fan_auto_cleaning_interval_days(4); ret)
+    {
+      Serial.print("Could not set auto clean interval for SPS sensor");
+    }
+
+    if (sps30_start_measurement() < 0)
+    {
+      Serial.println("Could not start SPS measurement");
+    }
+  }
+
+  void StopMeasurement()
+  {
+    if (sps30_stop_measurement() < 0)
+    {
+      Serial.println("Could not stop SPS measurement");
+    }
+  }
+
+  Data GetMeasurement()
+  {
+    uint16_t has_data;
+
+    if (sps30_read_data_ready(&has_data) < 0)
+    {
+      Serial.println("Could not read data ready for SPS");
+      return Data{};
+    }
+
+    if (!has_data)
+      return Data{};
+
+
+    struct sps30_measurement m;
+    if (sps30_read_measurement(&m) < 0)
+    {
+      Serial.println("Could not read data measurement for SPS");
+      return Data{};
+    }
+
+    return Data{m};
+  }
+};
 
 class VOCSensor
 {
@@ -177,6 +272,7 @@ private:
 
 CO2Sensor co2_sensor{Wire};
 VOCSensor voc_sensor{Wire};
+SPSSensor sps_sensor;
 
 void setup()
 {
@@ -189,6 +285,7 @@ void setup()
   Wire.begin();
   co2_sensor.StartMeasurement();
   voc_sensor.StartMeasurement();
+  sps_sensor.StartMeasurement();
 }
 
 void loop()
@@ -205,5 +302,11 @@ void loop()
   if (tvoc_data.valid)
   {
     Serial.println(tvoc_data);
+  }
+
+  auto const sps_data = sps_sensor.GetMeasurement();
+  if (sps_data.valid)
+  {
+    Serial.println(sps_data);
   }
 }

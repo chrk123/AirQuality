@@ -238,14 +238,18 @@ public:
     return data;
   }
 
-  void StartMeasurement()
+  void StartMeasurement(bool low_power = true)
   {
+    // sensor needs >1000ms to be ready
+    delay(1000);
+
     m_Sensor.begin(m_Bus);
-    if (auto const error = m_Sensor.startPeriodicMeasurement(); error)
-    {
-      Serial.print("Could not start the measurement: ");
-      PrintErrorMessage(error);
-    }
+
+    // 0x21ac is low power peridic measurement mode (30s measure interval)
+    Wire.beginTransmission(0x62);
+    Wire.write(0x21);
+    Wire.write(low_power ? 0xac : 0xb1);
+    Wire.endTransmission();
   }
 
   void StopMeasurement()
@@ -283,14 +287,14 @@ void setup()
   }
 
   Wire.begin();
-  co2_sensor.StartMeasurement();
   voc_sensor.StartMeasurement();
+  co2_sensor.StartMeasurement();
   sps_sensor.StartMeasurement();
 }
 
 void loop()
 {
-  delay(1000);
+  delay(10000);
 
   auto const co2_data = co2_sensor.GetMeasurement();
   if (co2_data.valid)

@@ -1,6 +1,7 @@
 #include <Adafruit_SGP30.h>
 #include <Arduino.h>
 #include <SensirionI2CScd4x.h>
+#include <U8glib.h>
 #include <Wire.h>
 #include <sps30.h>
 
@@ -48,16 +49,7 @@ public:
 
   void StartMeasurement()
   {
-    while (sps30_probe() != 0)
-    {
-      Serial.println("SPS sensor probing failed");
-      delay(500);
-    }
-
-    if (auto const ret = sps30_set_fan_auto_cleaning_interval_days(4); ret)
-    {
-      Serial.print("Could not set auto clean interval for SPS sensor");
-    }
+    sps30_set_fan_auto_cleaning_interval_days(4);
 
     if (sps30_start_measurement() < 0)
     {
@@ -150,14 +142,13 @@ public:
   {
     if (!m_Sensor.IAQmeasure())
     {
-      Serial.println("Could not measure VOC!");
       return {};
     }
 
     Data data;
+
     if (!m_Sensor.getIAQBaseline(&data.eco2_baseline, &data.tvoc_baseline))
     {
-      Serial.println("Could not determine baselines!");
       return data;
     }
 
@@ -274,9 +265,112 @@ private:
   SensirionI2CScd4x m_Sensor;
 };
 
+class Display
+{
+public:
+  void setup()
+  {
+    if (m_Display.getMode() == U8G_MODE_R3G3B2)
+    {
+      m_Display.setColorIndex(255); // white
+    }
+    else if (m_Display.getMode() == U8G_MODE_GRAY2BIT)
+    {
+      m_Display.setColorIndex(3); // max intensity
+    }
+    else if (m_Display.getMode() == U8G_MODE_BW)
+    {
+      m_Display.setColorIndex(1); // pixel on
+    }
+    else if (m_Display.getMode() == U8G_MODE_HICOLOR)
+    {
+      m_Display.setHiColorByRGB(255, 255, 255);
+    }
+
+    pinMode(8, OUTPUT);
+    m_Display.setFont(u8g_font_unifont);
+  }
+
+  void spinOnce()
+  {
+    m_Display.firstPage();
+    do
+    {
+      m_Display.drawStr(0, 15, "CO2: ");
+
+      itoa(m_CO2Data.co2, char_buffer, 10);
+      m_Display.drawStr(40, 15, char_buffer);
+
+    } while (m_Display.nextPage());
+
+    delay(3000);
+    m_Display.firstPage();
+    do
+    {
+      m_Display.drawStr(0, 15, "TVOC: ");
+
+      itoa(m_TVOCData.tvoc, char_buffer, 10);
+      m_Display.drawStr(40, 15, char_buffer);
+
+
+    } while (m_Display.nextPage());
+
+    delay(3000);
+    m_Display.firstPage();
+    do
+    {
+      m_Display.drawStr(0, 15, "PM1.0: ");
+      m_Display.drawStr(0, 30, "PM2.5: ");
+      m_Display.drawStr(0, 45, "PM4.0: ");
+      m_Display.drawStr(0, 60, "PM10: ");
+
+      dtostrf(m_SPSData.pm1, 4, 2, char_buffer);
+      m_Display.drawStr(60, 15, char_buffer);
+
+      dtostrf(m_SPSData.pm25, 4, 2, char_buffer);
+      m_Display.drawStr(60, 30, char_buffer);
+
+      dtostrf(m_SPSData.pm4, 4, 2, char_buffer);
+      m_Display.drawStr(60, 45, char_buffer);
+
+      dtostrf(m_SPSData.pm10, 4, 2, char_buffer);
+      m_Display.drawStr(60, 60, char_buffer);
+
+    } while (m_Display.nextPage());
+    delay(3000);
+  }
+
+  void SetCo2(CO2Sensor::Data const& data)
+  {
+    m_CO2Data = data;
+  }
+
+  void SetSPS(SPSSensor::Data const& data)
+  {
+    m_SPSData = data;
+  }
+
+  void SetTVOC(VOCSensor::Data const& data)
+  {
+    m_TVOCData = data;
+  }
+
+private:
+  char char_buffer[16];
+
+  CO2Sensor::Data m_CO2Data;
+  SPSSensor::Data m_SPSData;
+  VOCSensor::Data m_TVOCData;
+
+  U8GLIB_SH1106_128X64 m_Display;
+};
+
+
+Display   display;
+SPSSensor sps_sensor;
 CO2Sensor co2_sensor{Wire};
 VOCSensor voc_sensor{Wire};
-SPSSensor sps_sensor;
+
 
 void setup()
 {
@@ -287,30 +381,30 @@ void setup()
   }
 
   Wire.begin();
+  sps_sensor.StartMeasurement();
+
   voc_sensor.StartMeasurement();
   co2_sensor.StartMeasurement();
-  sps_sensor.StartMeasurement();
+
+  display.setup();
 }
 
 void loop()
 {
-  delay(10000);
-
-  auto const co2_data = co2_sensor.GetMeasurement();
-  if (co2_data.valid)
+  if (auto const co2_data = co2_sensor.GetMeasurement(); co2_data.valid)
   {
-    Serial.println(co2_data);
+    display.SetCo2(co2_data);
   }
 
-  auto const tvoc_data = voc_sensor.GetMeasurement();
-  if (tvoc_data.valid)
+  if (auto const tvoc_data = voc_sensor.GetMeasurement(); tvoc_data.valid)
   {
-    Serial.println(tvoc_data);
+    display.SetTVOC(tvoc_data);
   }
 
-  auto const sps_data = sps_sensor.GetMeasurement();
-  if (sps_data.valid)
+  if (auto const sps_data = sps_sensor.GetMeasurement(); sps_data.valid)
   {
-    Serial.println(sps_data);
+    display.SetSPS(sps_data);
   }
+
+  display.spinOnce();
 }

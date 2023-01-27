@@ -1,6 +1,6 @@
 # AirQuality
 
-An arduino project that aims to construct an air quality monitoring system based on three different hardware sensors.
+An arduino project that aims to construct an air quality monitoring system based on three different hardware sensors. Data is visualized using a small OLED display.
 
 ## Sensirion SCD41
 
@@ -22,7 +22,4 @@ The following libraries are required:
 - arduino-sps
 - Sensirion Core
 - Sensirion I2C SCD4x
-
-## Future ideas
-
-In the future, this project will either connect a display (LCD or OLED) for visualization purposes, or provide the data via bluetooth, in which case an app will be used for visualization.
+- U8Glib

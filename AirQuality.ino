@@ -349,6 +349,17 @@ public:
     m_Display.print(isAirGood ? "good" : "bad");
   }
 
+  void drawHeatUpScreen()
+  {
+    m_Display.clearBuffer();
+    m_Display.fillScreen(EPD_WHITE);
+
+    m_Display.setCursor(m_Display.width() / 5, m_Display.height() / 2);
+    m_Display.setFont(&FreeSansBoldOblique9pt7b);
+    m_Display.print("Preparing sensors...");
+    m_Display.display(true);
+  }
+
   void spinOnce()
   {
     m_Display.clearBuffer();
@@ -433,6 +444,12 @@ VOCSensor voc_sensor{Wire};
 
 Display display;
 
+void sleepFor(unsigned long const ms)
+{
+  for (uint8_t i = 0; i < ceil(ms / 8000.); ++i)
+    LowPower.powerStandby(SLEEP_8S, ADC_OFF, BOD_OFF);
+}
+
 void setup()
 {
   Wire.begin();
@@ -440,15 +457,15 @@ void setup()
   voc_sensor.StartMeasurement();
   co2_sensor.StartMeasurement();
   display.setup();
+  display.drawHeatUpScreen();
 }
 
-constexpr uint64_t const UPDATE_INTERVAL = 5 * 60000;
+constexpr uint64_t const UPDATE_INTERVAL    = 3 * 60000;
+constexpr uint64_t const SENSOR_HEATUP_TIME = 35000;
 
 void loop()
 {
-  // wait until sensors get ready
-  delay(5000);
-
+  sleepFor(SENSOR_HEATUP_TIME);
   if (auto const co2_data = co2_sensor.GetMeasurement(); co2_data.valid)
   {
     display.SetCo2(co2_data);
@@ -469,9 +486,7 @@ void loop()
   // co2_sensor.onSleep();
   sps_sensor.onSleep();
 
-  for (uint8_t i = 0; i < UPDATE_INTERVAL / 8000; ++i)
-    LowPower.powerStandby(SLEEP_8S, ADC_OFF, BOD_OFF);
-
+  sleepFor(UPDATE_INTERVAL - SENSOR_HEATUP_TIME);
 
   sps_sensor.onResume();
   // co2_sensor.onResume();

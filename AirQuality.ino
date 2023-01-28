@@ -1,9 +1,18 @@
+#include <Adafruit_EPD.h>
+#include <Adafruit_GFX.h>
 #include <Adafruit_SGP30.h>
 #include <Arduino.h>
+#include <Fonts/FreeSans9pt7b.h>
+#include <Fonts/FreeSansBoldOblique9pt7b.h>
 #include <SensirionI2CScd4x.h>
-#include <U8glib.h>
 #include <Wire.h>
 #include <sps30.h>
+
+#define EPD_CS    10
+#define EPD_DC    9
+#define SRAM_CS   8
+#define EPD_RESET 7 // can set to -1 and share with microcontroller Reset!
+#define EPD_BUSY  6
 
 class SPSSensor
 {
@@ -50,19 +59,12 @@ public:
   void StartMeasurement()
   {
     sps30_set_fan_auto_cleaning_interval_days(4);
-
-    if (sps30_start_measurement() < 0)
-    {
-      Serial.println("Could not start SPS measurement");
-    }
+    sps30_start_measurement();
   }
 
   void StopMeasurement()
   {
-    if (sps30_stop_measurement() < 0)
-    {
-      Serial.println("Could not stop SPS measurement");
-    }
+    sps30_stop_measurement();
   }
 
   Data GetMeasurement()
@@ -71,7 +73,6 @@ public:
 
     if (sps30_read_data_ready(&has_data) < 0)
     {
-      Serial.println("Could not read data ready for SPS");
       return Data{};
     }
 
@@ -82,7 +83,6 @@ public:
     struct sps30_measurement m;
     if (sps30_read_measurement(&m) < 0)
     {
-      Serial.println("Could not read data measurement for SPS");
       return Data{};
     }
 
@@ -127,14 +127,12 @@ public:
   {
     if (!m_Sensor.begin(&m_Bus))
     {
-      Serial.println("Could not start VOC measurement!");
       return;
     }
 
     // values based on previous calibration
     if (!m_Sensor.setIAQBaseline(37120, 39100))
     {
-      Serial.println("Setting baseline failed");
     }
   }
 
@@ -205,8 +203,6 @@ public:
 
     if (auto const error = m_Sensor.getDataReadyFlag(has_data); error)
     {
-      Serial.print("Could not obtain data ready flag: ");
-      PrintErrorMessage(error);
       return {};
     }
 
@@ -216,12 +212,7 @@ public:
     Data data;
     if (auto const error = m_Sensor.readMeasurement(data.co2, data.temperature,
                                                     data.humidity);
-        error)
-    {
-      Serial.print("Could not read the measurement: ");
-      PrintErrorMessage(error);
-    }
-    else if (data.co2 != 0 /*according to example, thats an invalid sample*/)
+        !error && data.co2 != 0)
     {
       data.valid = true;
     }
@@ -245,99 +236,125 @@ public:
 
   void StopMeasurement()
   {
-    if (auto const error = m_Sensor.stopPeriodicMeasurement(); error)
-    {
-      Serial.print("Could not stop the measurement: ");
-      PrintErrorMessage(error);
-    }
+    m_Sensor.stopPeriodicMeasurement();
   }
 
 private:
-  void PrintErrorMessage(uint16_t error)
-  {
-    char error_message[256];
-
-    errorToString(error, error_message, 256);
-    Serial.println(error_message);
-  }
-
   TwoWire&          m_Bus;
   SensirionI2CScd4x m_Sensor;
 };
+
+uint8_t const GRID_DX     = 88;
+uint8_t const GRID_DY     = 58;
+uint8_t const LINE_HEIGHT = GRID_DY / 2;
 
 class Display
 {
 public:
   void setup()
   {
-    if (m_Display.getMode() == U8G_MODE_R3G3B2)
-    {
-      m_Display.setColorIndex(255); // white
-    }
-    else if (m_Display.getMode() == U8G_MODE_GRAY2BIT)
-    {
-      m_Display.setColorIndex(3); // max intensity
-    }
-    else if (m_Display.getMode() == U8G_MODE_BW)
-    {
-      m_Display.setColorIndex(1); // pixel on
-    }
-    else if (m_Display.getMode() == U8G_MODE_HICOLOR)
-    {
-      m_Display.setHiColorByRGB(255, 255, 255);
-    }
+    m_Display.begin();
+    m_Display.setFont(&FreeSans9pt7b);
+  }
 
-    pinMode(8, OUTPUT);
-    m_Display.setFont(u8g_font_unifont);
+  void drawDataCell(char* title, uint16_t value)
+  {
+    auto const original_cursor_x = m_Display.getCursorX();
+    auto const original_cursor_y = m_Display.getCursorY();
+
+    m_Display.setFont(&FreeSansBoldOblique9pt7b);
+    m_Display.setCursor(original_cursor_x + 4, original_cursor_y + 4);
+    m_Display.print(title);
+    m_Display.setFont(&FreeSans9pt7b);
+    m_Display.setCursor(original_cursor_x + 10,
+                        original_cursor_y + LINE_HEIGHT);
+    itoa(m_CO2Data.co2, m_Buffer, 10);
+    m_Display.drawRect(original_cursor_x, original_cursor_y - 15, GRID_DX,
+                       GRID_DY, EPD_BLACK);
+    m_Display.print(m_Buffer);
+  }
+
+  void drawDataCell(char* title, float value)
+  {
+    auto const original_cursor_x = m_Display.getCursorX();
+    auto const original_cursor_y = m_Display.getCursorY();
+
+    m_Display.setFont(&FreeSansBoldOblique9pt7b);
+    m_Display.setCursor(original_cursor_x + 4, original_cursor_y + 4);
+    m_Display.print(title);
+    m_Display.setFont(&FreeSans9pt7b);
+    m_Display.setCursor(original_cursor_x + 10,
+                        original_cursor_y + LINE_HEIGHT);
+    dtostrf(value, 4, 2, m_Buffer);
+    m_Display.drawRect(original_cursor_x, original_cursor_y - 15, GRID_DX,
+                       GRID_DY, EPD_BLACK);
+    m_Display.print(m_Buffer);
+  }
+
+  void drawStatusCell(bool isAirGood)
+  {
+    auto const original_cursor_x = m_Display.getCursorX();
+    auto const original_cursor_y = m_Display.getCursorY();
+
+    m_Display.drawRect(original_cursor_x, original_cursor_y - 15, GRID_DX,
+                       GRID_DY, EPD_BLACK);
+
+    m_Display.setCursor(original_cursor_x + GRID_DX / 4,
+                        original_cursor_y + GRID_DY / 3);
+    m_Display.print(isAirGood ? "good" : "bad");
   }
 
   void spinOnce()
   {
-    m_Display.firstPage();
-    do
+    m_Display.clearBuffer();
+    m_Display.fillScreen(EPD_WHITE);
+
+    for (uint8_t x = 0; x < 3; ++x)
     {
-      m_Display.drawStr(0, 15, "CO2: ");
+      for (uint8_t y = 0; y < 3; ++y)
+      {
+        // add some screen offset so that the first line appears...
+        m_Display.setCursor(x * GRID_DX, y * GRID_DY + 15);
 
-      itoa(m_CO2Data.co2, char_buffer, 10);
-      m_Display.drawStr(40, 15, char_buffer);
-
-    } while (m_Display.nextPage());
-
-    delay(3000);
-    m_Display.firstPage();
-    do
-    {
-      m_Display.drawStr(0, 15, "TVOC: ");
-
-      itoa(m_TVOCData.tvoc, char_buffer, 10);
-      m_Display.drawStr(40, 15, char_buffer);
-
-
-    } while (m_Display.nextPage());
-
-    delay(3000);
-    m_Display.firstPage();
-    do
-    {
-      m_Display.drawStr(0, 15, "PM1.0: ");
-      m_Display.drawStr(0, 30, "PM2.5: ");
-      m_Display.drawStr(0, 45, "PM4.0: ");
-      m_Display.drawStr(0, 60, "PM10: ");
-
-      dtostrf(m_SPSData.pm1, 4, 2, char_buffer);
-      m_Display.drawStr(60, 15, char_buffer);
-
-      dtostrf(m_SPSData.pm25, 4, 2, char_buffer);
-      m_Display.drawStr(60, 30, char_buffer);
-
-      dtostrf(m_SPSData.pm4, 4, 2, char_buffer);
-      m_Display.drawStr(60, 45, char_buffer);
-
-      dtostrf(m_SPSData.pm10, 4, 2, char_buffer);
-      m_Display.drawStr(60, 60, char_buffer);
-
-    } while (m_Display.nextPage());
-    delay(3000);
+        if (x == 0 && y == 0)
+        {
+          drawDataCell("CO2", m_CO2Data.co2);
+        }
+        else if (x == 1 && y == 0)
+        {
+          drawDataCell("Temp", m_CO2Data.temperature);
+        }
+        else if (x == 2 && y == 0)
+        {
+          drawDataCell("Humid", m_CO2Data.humidity);
+        }
+        else if (x == 0 && y == 1)
+        {
+          drawDataCell("PM1.0", m_SPSData.pm1);
+        }
+        else if (x == 1 && y == 1)
+        {
+          drawDataCell("PM2.5", m_SPSData.pm25);
+        }
+        else if (x == 2 && y == 1)
+        {
+          drawDataCell("TVOC", m_TVOCData.tvoc);
+        }
+        else if (x == 0 && y == 2)
+        {
+          drawDataCell("PM4.0", m_SPSData.pm4);
+        }
+        else if (x == 1 && y == 2)
+        {
+          drawDataCell("PM10", m_SPSData.pm10);
+        }
+        else if (x == 2 && y == 2)
+        {
+          drawStatusCell(true);
+        }
+      }
+    }
+    m_Display.display(true);
   }
 
   void SetCo2(CO2Sensor::Data const& data)
@@ -356,36 +373,29 @@ public:
   }
 
 private:
-  char char_buffer[16];
-
+  char            m_Buffer[16];
   CO2Sensor::Data m_CO2Data;
   SPSSensor::Data m_SPSData;
   VOCSensor::Data m_TVOCData;
 
-  U8GLIB_SH1106_128X64 m_Display;
+  Adafruit_IL91874 m_Display{264, 176, EPD_DC, EPD_RESET, EPD_CS, SRAM_CS};
 };
 
 
-Display   display;
 SPSSensor sps_sensor;
 CO2Sensor co2_sensor{Wire};
 VOCSensor voc_sensor{Wire};
 
+Display display;
+
 
 void setup()
 {
-  Serial.begin(115200);
-  while (!Serial)
-  {
-    delay(100);
-  }
-
   Wire.begin();
   sps_sensor.StartMeasurement();
 
   voc_sensor.StartMeasurement();
   co2_sensor.StartMeasurement();
-
   display.setup();
 }
 
@@ -407,4 +417,5 @@ void loop()
   }
 
   display.spinOnce();
+  delay(3 * 60000);
 }

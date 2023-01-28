@@ -18,8 +18,8 @@ This one is used to measure TVOC.
 
 The following libraries are required:
 - Adafruit BusIO
-- Adafruit SGP30 Sensor
+- Adafruit SGP30 Sensora
+- Adafruit EPD/GFX
 - arduino-sps
 - Sensirion Core
 - Sensirion I2C SCD4x
-- U8Glib

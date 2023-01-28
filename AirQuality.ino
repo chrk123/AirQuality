@@ -302,7 +302,7 @@ public:
     m_Display.setFont(&FreeSans9pt7b);
   }
 
-  void drawDataCell(char* title, uint16_t value)
+  void drawDataCell(char const* title, uint16_t const value)
   {
     auto const original_cursor_x = m_Display.getCursorX();
     auto const original_cursor_y = m_Display.getCursorY();
@@ -313,13 +313,13 @@ public:
     m_Display.setFont(&FreeSans9pt7b);
     m_Display.setCursor(original_cursor_x + 10,
                         original_cursor_y + LINE_HEIGHT);
-    itoa(m_CO2Data.co2, m_Buffer, 10);
+    itoa(value, m_Buffer, 10);
     m_Display.drawRect(original_cursor_x, original_cursor_y - 15, GRID_DX,
                        GRID_DY, EPD_BLACK);
     m_Display.print(m_Buffer);
   }
 
-  void drawDataCell(char* title, float value)
+  void drawDataCell(char const* title, float const value)
   {
     auto const original_cursor_x = m_Display.getCursorX();
     auto const original_cursor_y = m_Display.getCursorY();

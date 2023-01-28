@@ -56,6 +56,18 @@ public:
     StopMeasurement();
   }
 
+  void onSleep()
+  {
+    StopMeasurement();
+    // TODO: implement sleep according to datasheet
+  }
+
+  void onResume()
+  {
+    // TOOD: implement wakeup according to datasheet
+    StartMeasurement();
+  }
+
   void StartMeasurement()
   {
     sps30_set_fan_auto_cleaning_interval_days(4);

@@ -266,6 +266,7 @@ public:
     delay(1000);
 
     m_Sensor.begin(m_Bus);
+    m_Sensor.setSensorAltitude(520 /* Munich, in meter*/);
 
     if (m_MeasureMode == MeasureMode::SingleShot)
       return;

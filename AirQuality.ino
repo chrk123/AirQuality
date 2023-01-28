@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <Fonts/FreeSans9pt7b.h>
 #include <Fonts/FreeSansBoldOblique9pt7b.h>
+#include <LowPower.h>
 #include <SensirionI2CScd4x.h>
 #include <Wire.h>
 #include <sps30.h>
@@ -288,9 +289,9 @@ private:
   MeasureMode       m_MeasureMode;
 };
 
-uint8_t const GRID_DX     = 88;
-uint8_t const GRID_DY     = 58;
-uint8_t const LINE_HEIGHT = GRID_DY / 2;
+constexpr uint8_t const GRID_DX     = 88;
+constexpr uint8_t const GRID_DY     = 58;
+constexpr uint8_t const LINE_HEIGHT = GRID_DY / 2;
 
 class Display
 {
@@ -432,19 +433,22 @@ VOCSensor voc_sensor{Wire};
 
 Display display;
 
-
 void setup()
 {
   Wire.begin();
   sps_sensor.StartMeasurement();
-
   voc_sensor.StartMeasurement();
   co2_sensor.StartMeasurement();
   display.setup();
 }
 
+constexpr uint64_t const UPDATE_INTERVAL = 5 * 60000;
+
 void loop()
 {
+  // wait until sensors get ready
+  delay(5000);
+
   if (auto const co2_data = co2_sensor.GetMeasurement(); co2_data.valid)
   {
     display.SetCo2(co2_data);
@@ -461,5 +465,14 @@ void loop()
   }
 
   display.spinOnce();
-  delay(3 * 60000);
+
+  co2_sensor.onSleep();
+  sps_sensor.onSleep();
+
+  for (uint8_t i = 0; i < UPDATE_INTERVAL / 8000; ++i)
+    LowPower.powerStandby(SLEEP_8S, ADC_OFF, BOD_OFF);
+
+
+  sps_sensor.onResume();
+  co2_sensor.onResume();
 }

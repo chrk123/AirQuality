@@ -23,3 +23,4 @@ The following libraries are required:
 - arduino-sps
 - Sensirion Core
 - Sensirion I2C SCD4x
+- LowPower

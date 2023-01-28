@@ -271,11 +271,10 @@ public:
     if (m_MeasureMode == MeasureMode::SingleShot)
       return;
 
-    // 0x21ac is low power peridic measurement mode (30s measure interval)
-    Wire.beginTransmission(0x62);
-    Wire.write(0x21);
-    Wire.write(m_MeasureMode == MeasureMode::LowPowerPeriodic ? 0xac : 0xb1);
-    Wire.endTransmission();
+    if (m_MeasureMode == MeasureMode::LowPowerPeriodic)
+      m_Sensor.startLowPowerPeriodicMeasurement();
+    else
+      m_Sensor.startPeriodicMeasurement();
   }
 
   void StopMeasurement()
@@ -429,7 +428,7 @@ private:
 
 
 SPSSensor sps_sensor;
-CO2Sensor co2_sensor{Wire};
+CO2Sensor co2_sensor{Wire, CO2Sensor::MeasureMode::LowPowerPeriodic};
 VOCSensor voc_sensor{Wire};
 
 Display display;
@@ -467,7 +466,7 @@ void loop()
 
   display.spinOnce();
 
-  co2_sensor.onSleep();
+  // co2_sensor.onSleep();
   sps_sensor.onSleep();
 
   for (uint8_t i = 0; i < UPDATE_INTERVAL / 8000; ++i)
@@ -475,5 +474,5 @@ void loop()
 
 
   sps_sensor.onResume();
-  co2_sensor.onResume();
+  // co2_sensor.onResume();
 }

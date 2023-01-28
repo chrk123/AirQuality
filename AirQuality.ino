@@ -183,7 +183,16 @@ public:
     }
   };
 
-  explicit CO2Sensor(TwoWire& i2c_bus) : m_Bus{i2c_bus}
+  enum class MeasureMode
+  {
+    SingleShot,
+    LowPowerPeriodic,
+    NormalPeriodic,
+  };
+
+  explicit CO2Sensor(TwoWire&    i2c_bus,
+                     MeasureMode measure_mode = MeasureMode::SingleShot)
+    : m_Bus{i2c_bus}, m_MeasureMode{measure_mode}
   {
   }
 
@@ -197,9 +206,27 @@ public:
     StopMeasurement();
   }
 
+  void onSleep()
+  {
+    StopMeasurement();
+    m_Sensor.powerDown();
+  }
+
+  void onResume()
+  {
+    m_Sensor.wakeUp();
+    StartMeasurement();
+  }
+
   Data GetMeasurement()
   {
     bool has_data = false;
+
+    if (m_MeasureMode == MeasureMode::SingleShot)
+    {
+      m_Sensor.measureSingleShot();
+      delay(500);
+    }
 
     if (auto const error = m_Sensor.getDataReadyFlag(has_data); error)
     {
@@ -220,28 +247,33 @@ public:
     return data;
   }
 
-  void StartMeasurement(bool low_power = true)
+  void StartMeasurement()
   {
     // sensor needs >1000ms to be ready
     delay(1000);
 
     m_Sensor.begin(m_Bus);
 
+    if (m_MeasureMode == MeasureMode::SingleShot)
+      return;
+
     // 0x21ac is low power peridic measurement mode (30s measure interval)
     Wire.beginTransmission(0x62);
     Wire.write(0x21);
-    Wire.write(low_power ? 0xac : 0xb1);
+    Wire.write(m_MeasureMode == MeasureMode::LowPowerPeriodic ? 0xac : 0xb1);
     Wire.endTransmission();
   }
 
   void StopMeasurement()
   {
-    m_Sensor.stopPeriodicMeasurement();
+    if (m_MeasureMode != MeasureMode::SingleShot)
+      m_Sensor.stopPeriodicMeasurement();
   }
 
 private:
   TwoWire&          m_Bus;
   SensirionI2CScd4x m_Sensor;
+  MeasureMode       m_MeasureMode;
 };
 
 uint8_t const GRID_DX     = 88;

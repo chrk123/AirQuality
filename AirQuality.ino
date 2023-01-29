@@ -203,9 +203,23 @@ public:
     NormalPeriodic,
   };
 
-  explicit CO2Sensor(TwoWire&    i2c_bus,
+  struct EnvironmentSettings
+  {
+    explicit EnvironmentSettings(uint16_t altitude, float temp_offset)
+      : altitude{altitude}, temperature_offset{temp_offset}
+    {
+    }
+
+    // altitude in m over sea level
+    uint16_t altitude{0};
+
+    // offset in deg C
+    float temperature_offset{0.0f};
+  };
+
+  explicit CO2Sensor(TwoWire& i2c_bus, EnvironmentSettings settings,
                      MeasureMode measure_mode = MeasureMode::SingleShot)
-    : m_Bus{i2c_bus}, m_MeasureMode{measure_mode}
+    : m_Bus{i2c_bus}, m_Settings{settings}, m_MeasureMode{measure_mode}
   {
   }
 
@@ -266,7 +280,12 @@ public:
     delay(1000);
 
     m_Sensor.begin(m_Bus);
-    m_Sensor.setSensorAltitude(520 /* Munich, in meter*/);
+
+    // stop any previous ongoing measurement
+    StopMeasurement();
+
+    m_Sensor.setSensorAltitude(m_Settings.altitude);
+    m_Sensor.setTemperatureOffset(m_Settings.temperature_offset);
 
     if (m_MeasureMode == MeasureMode::SingleShot)
       return;
@@ -279,14 +298,14 @@ public:
 
   void StopMeasurement()
   {
-    if (m_MeasureMode != MeasureMode::SingleShot)
-      m_Sensor.stopPeriodicMeasurement();
+    m_Sensor.stopPeriodicMeasurement();
   }
 
 private:
-  TwoWire&          m_Bus;
-  SensirionI2CScd4x m_Sensor;
-  MeasureMode       m_MeasureMode;
+  TwoWire&            m_Bus;
+  SensirionI2CScd4x   m_Sensor;
+  MeasureMode         m_MeasureMode;
+  EnvironmentSettings m_Settings;
 };
 
 constexpr uint8_t const GRID_DX     = 88;
@@ -439,7 +458,10 @@ private:
 
 
 SPSSensor sps_sensor;
-CO2Sensor co2_sensor{Wire, CO2Sensor::MeasureMode::LowPowerPeriodic};
+CO2Sensor co2_sensor{
+        Wire, CO2Sensor::EnvironmentSettings{520u, 0.0f},
+        CO2Sensor::MeasureMode::LowPowerPeriodic
+};
 VOCSensor voc_sensor{Wire};
 
 Display display;
@@ -481,6 +503,7 @@ void loop()
     display.SetSPS(sps_data);
   }
 
+
   display.spinOnce();
 
   // co2_sensor.onSleep();
@@ -489,5 +512,5 @@ void loop()
   sleepFor(UPDATE_INTERVAL - SENSOR_HEATUP_TIME);
 
   sps_sensor.onResume();
-  // co2_sensor.onResume();
+  //  co2_sensor.onResume();
 }

@@ -144,9 +144,7 @@ public:
     }
 
     // values based on previous calibration
-    if (!m_Sensor.setIAQBaseline(37120, 39100))
-    {
-    }
+    m_Sensor.setIAQBaseline(37120, 39100);
   }
 
   Data GetMeasurement()

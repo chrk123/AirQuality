@@ -9,11 +9,20 @@
 #include <Wire.h>
 #include <sps30.h>
 
-#define EPD_CS    10
-#define EPD_DC    9
-#define SRAM_CS   8
-#define EPD_RESET 7 // can set to -1 and share with microcontroller Reset!
-#define EPD_BUSY  6
+constexpr uint8_t EPD_CS    = 10;
+constexpr uint8_t EPD_DC    = 9;
+constexpr uint8_t SRAM_CS   = 8;
+constexpr uint8_t EPD_RESET = 7;
+constexpr uint8_t EPD_BUSY  = 6;
+
+constexpr uint16_t DISPLAY_HEIGHT = 176;
+constexpr uint16_t DISPLAY_WIDTH  = 264;
+constexpr uint16_t GRID_DX        = DISPLAY_WIDTH / 3;
+constexpr uint16_t GRID_DY        = DISPLAY_HEIGHT / 3;
+constexpr uint16_t LINE_HEIGHT    = GRID_DY / 2;
+
+constexpr uint64_t UPDATE_INTERVAL    = 3 * 60000;
+constexpr uint64_t SENSOR_HEATUP_TIME = 35000;
 
 class SPSSensor
 {
@@ -306,10 +315,6 @@ private:
   EnvironmentSettings m_Settings;
 };
 
-constexpr uint8_t const GRID_DX     = 88;
-constexpr uint8_t const GRID_DY     = 58;
-constexpr uint8_t const LINE_HEIGHT = GRID_DY / 2;
-
 class Display
 {
 public:
@@ -451,7 +456,8 @@ private:
   SPSSensor::Data m_SPSData;
   VOCSensor::Data m_TVOCData;
 
-  Adafruit_IL91874 m_Display{264, 176, EPD_DC, EPD_RESET, EPD_CS, SRAM_CS};
+  Adafruit_IL91874 m_Display{DISPLAY_WIDTH, DISPLAY_HEIGHT, EPD_DC,
+                             EPD_RESET,     EPD_CS,         SRAM_CS};
 };
 
 
@@ -479,9 +485,6 @@ void setup()
   display.setup();
   display.drawHeatUpScreen();
 }
-
-constexpr uint64_t const UPDATE_INTERVAL    = 3 * 60000;
-constexpr uint64_t const SENSOR_HEATUP_TIME = 35000;
 
 void loop()
 {

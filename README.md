@@ -1,6 +1,6 @@
 # AirQuality
 
-An arduino project that aims to construct an air quality monitoring system based on three different hardware sensors. Data is visualized using a small OLED display.
+An arduino project that aims to construct an air quality monitoring system based on three different hardware sensors. Data is visualized using a small 2.7 inch e ink display by Adafruit.
 
 ## Sensirion SCD41
 

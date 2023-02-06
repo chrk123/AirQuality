@@ -463,7 +463,7 @@ private:
 
 SPSSensor sps_sensor;
 CO2Sensor co2_sensor{
-        Wire, CO2Sensor::EnvironmentSettings{520u, 0.0f},
+        Wire, CO2Sensor::EnvironmentSettings{520u, 4.0f},
         CO2Sensor::MeasureMode::LowPowerPeriodic
 };
 VOCSensor voc_sensor{Wire};

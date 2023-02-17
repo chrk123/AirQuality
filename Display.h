@@ -55,14 +55,22 @@ public:
 
   void getBoundaries(int& vmin, int& vmax) const
   {
-    vmin = -2147483648;
-    vmax = 2147483647;
+    if (m_Size == 0)
+    {
+      vmin = INT16_MIN;
+      vmax = INT16_MAX;
+      return;
+    }
 
-    for (int i = 0; i < m_Size; i++)
+    vmin = m_Buffer[0];
+    vmax = m_Buffer[0];
+
+    for (int i = 1; i < m_Size; i++)
     {
       if (m_Buffer[i] < vmin)
         vmin = m_Buffer[i];
-      else if (m_Buffer[i] > vmax)
+
+      if (m_Buffer[i] > vmax)
         vmax = m_Buffer[i];
     }
   }
@@ -189,7 +197,7 @@ public:
     m_Display.setCursor(origin_x + plot_width + legend_padding,
                         origin_y + margin_top + plot_height / 2 + font_offset);
 
-    m_Display.print((y_max - y_min) / 2);
+    m_Display.print((y_max - y_min) / 2 + y_min);
 
     m_Display.drawFastHLine(origin_x, origin_y + margin_top + plot_height,
                             plot_width, EPD_BLACK);
@@ -252,7 +260,7 @@ public:
 
     m_Display.setCursor(0 * GRID_DX, 0 * GRID_DY + Y_OFFSET);
     itoa(m_CO2Data.co2, m_Buffer, 10);
-    drawPlotCells("CO2", "ppm", m_Buffer, m_CO2History, 400, 1700);
+    drawPlotCells("CO2", "ppm", m_Buffer, m_CO2History, 400, 1500);
 
     m_Display.setCursor(2 * GRID_DX, 0 * GRID_DY + Y_OFFSET);
     drawDataCell("PM10", "ug/m3", m_SPSData.pm10);

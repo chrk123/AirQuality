@@ -142,16 +142,7 @@ public:
     m_Display.setCursor(original_cursor_x + GRID_DX / 4,
                         original_cursor_y + GRID_DY / 3);
 
-    if (level == AirQualityLevel::Good)
-    {
-      m_Display.setTextColor(EPD_BLACK);
-      m_Display.print("good");
-    }
-    else
-    {
-      m_Display.setTextColor(EPD_RED);
-      m_Display.print("bad");
-    }
+    m_Display.print(level == AirQualityLevel::Good ? "good" : "bad");
   }
 
   void plot2d(int const* values, size_t count, int y_min, int y_max,
